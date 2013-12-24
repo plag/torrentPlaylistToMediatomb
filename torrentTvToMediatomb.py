@@ -1,11 +1,8 @@
 #!/usr/bin/python
-
-
 import ConfigParser
 import urllib2
 import sqlite3
 import time
-
 
 def configReader(fileName):
     config = ConfigParser.ConfigParser()
@@ -24,11 +21,10 @@ def main():
     link = config.get('Main', 'playlist')
     dbFile = config.get('db', 'name')
     dbConn = getDbConn(dbFile)
-    parentId = 17
+    parentId = config.get('db', 'categoryId')
     clearCategory(dbConn, parentId);
     transferPlaylist(link, parentId, dbConn)
-    #for row in dbReader():
-    #    print row
+    dbConn.close()
 
 def makeConfig(fileName):
     config = ConfigParser.RawConfigParser()
@@ -37,6 +33,7 @@ def makeConfig(fileName):
     config.add_section('db')
     config.set('db', 'name', '/Users/vitek/python/torrentTvToMediatomb/mediatomb.db')
     config.set('db', 'folderName', 'Torrent-TV')
+    config.set('db', 'categoryId', '17')
 
     with open('config.cfg', 'wb') as configfile:
         config.write(configfile)
@@ -64,7 +61,7 @@ def transferPlaylist(link, categoryId, dbConn):
     parentCategoryLocationCursor = cursor.execute('SELECT location FROM mt_cds_object WHERE id = ' + str(categoryId))
     parentCategoryLocation = parentCategoryLocationCursor.fetchone()
     parentCategoryLocation = parentCategoryLocation[0]
-    
+
     categories = dict()
     fakeId = 0
     for row in u:
@@ -77,11 +74,7 @@ def transferPlaylist(link, categoryId, dbConn):
             else:
                 categoryName = 'HZ'
             if not categoryName in categories:
-                print 'new category: ' + categoryName
-                categories[categoryName] = fakeId
-                fakeId += 1
-
-                categoryLocation = parentCategoryLocation.encode('cp1251') + '/' + categoryName
+                categoryLocation = parentCategoryLocation.encode('ascii') + '/' + categoryName
 
                 dbRow = ('',\
                          str(categoryId),\
@@ -99,21 +92,19 @@ def transferPlaylist(link, categoryId, dbConn):
                          '',\
                          ''
                 )
-                #print dbRow
                 sql = 'INSERT INTO mt_cds_object(' + columnsSql + \
                              ") VALUES ('" + "','".join(dbRow) + "')"
-                print sql
-                #cursor.lastrowid
-            #print channelName + ':' + categoryName
-            
-            #print channelName
+                cursor.execute(sql)
+                categories[categoryName] = cursor.lastrowid
+
+                print 'new category: ' + categoryName + ' id #' + str(categories[categoryName])
         elif row.startswith('#'):
             continue
         else:
             streamHash = 'http://192.168.100.28:8000/pid/' + row.rstrip('\n')
             dbRow = ('',\
-                     str(categoryId),\
                      str(categories[categoryName]),\
+                     '10',\
                      'object.item.videoItem',\
                      channelName,\
                      streamHash,\
@@ -127,16 +118,16 @@ def transferPlaylist(link, categoryId, dbConn):
                      '',\
                      ''
             )
-                
+
             sql = 'INSERT INTO mt_cds_object(' + columnsSql + \
                              ") VALUES ('" + "','".join(dbRow) + "')"
-            print sql
-            #cursor.execute(sql)
+            print 'channel ' + channelName + ':' + categoryName
+            cursor.execute(sql)
     dbConn.commit()
 
 def log(message):
-    print time.strftime('%Y-%m-%d %H:%M:%S: ') + message 
-    
+    print time.strftime('%Y-%m-%d %H:%M:%S: ') + message
+
 def clearCategory(dbConn, id):
     log('clearing category ' + str(id))
     cursor = dbConn.cursor()
@@ -150,19 +141,19 @@ def clearSubcat(dbConn, ids):
     result = cursor.execute('SELECT id from mt_cds_object WHERE parent_id in (' + sqlIds + ')')
     ids = list(int(i[0]) for i in result)
     if ids:
-        clearSubcat(dbConn, ids)   
+        clearSubcat(dbConn, ids)
     sql = 'DELETE FROM mt_cds_object WHERE id in (' + sqlIds + ')'
-    #cursor.execute(sql)
+    cursor.execute(sql)
     dbConn.commit()
-    
+
 def getHash(string):
     hash = 5381
     bits32 = 2 ** 32 - 1
+
     for c in string:
         hash = ((hash << 5) + hash) ^ ord(c)
     return hash & bits32
-    
+
 if __name__ == '__main__':
     #makeConfig('config.cfg')
-    #print getHash('V/Torrent-TV/2')
     main()
