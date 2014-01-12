@@ -4,6 +4,7 @@ import urllib2
 import sqlite3
 import time
 import socket
+import sys
 
 def configReader(fileName):
     config = ConfigParser.ConfigParser()
@@ -18,7 +19,7 @@ def importPlaylist(listReader):
     return
 
 def main():
-    config = configReader('config.cfg')
+    config = configReader(sys.argv[1])
     link = config.get('Main', 'playlist')
     dbFile = config.get('db', 'name')
     dbConn = getDbConn(dbFile)
