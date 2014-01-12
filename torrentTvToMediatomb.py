@@ -3,6 +3,7 @@ import ConfigParser
 import urllib2
 import sqlite3
 import time
+import socket
 
 def configReader(fileName):
     config = ConfigParser.ConfigParser()
@@ -22,9 +23,16 @@ def main():
     dbFile = config.get('db', 'name')
     dbConn = getDbConn(dbFile)
     parentId = config.get('db', 'categoryId')
+    aceHost = config.get('Main', 'aceHost')
+    acePort = config.get('Main', 'acePort')
+    if aceHost == 'localhost':
+        aceHost = getHostIp()
     clearCategory(dbConn, parentId);
-    transferPlaylist(link, parentId, dbConn)
+    transferPlaylist(link, parentId, dbConn, aceHost, acePort)
     dbConn.close()
+
+def getHostIp():
+    return socket.gethostbyname(socket.gethostname())
 
 def makeConfig(fileName):
     config = ConfigParser.RawConfigParser()
@@ -34,11 +42,13 @@ def makeConfig(fileName):
     config.set('db', 'name', '/Users/vitek/python/torrentTvToMediatomb/mediatomb.db')
     config.set('db', 'folderName', 'Torrent-TV')
     config.set('db', 'categoryId', '17')
+    config.set('Main', 'aceHost', '192.168.100.16')
+    config.set('Main', 'acePort', '8080')
 
     with open('config.cfg', 'wb') as configfile:
         config.write(configfile)
 
-def transferPlaylist(link, categoryId, dbConn):
+def transferPlaylist(link, categoryId, dbConn, aceHost, acePort):
     u = urllib2.urlopen(link)
     columns = ('ref_id',\
                'parent_id',\
@@ -101,7 +111,7 @@ def transferPlaylist(link, categoryId, dbConn):
         elif row.startswith('#'):
             continue
         else:
-            streamHash = 'http://192.168.100.28:8000/pid/' + row.rstrip('\n')
+            streamHash = 'http://' + aceHost + ':' + acePort + '/pid/' + row.rstrip('\n')
             dbRow = ('',\
                      str(categories[categoryName]),\
                      '10',\
@@ -155,5 +165,5 @@ def getHash(string):
     return hash & bits32
 
 if __name__ == '__main__':
-    #makeConfig('config.cfg')
+    # makeConfig('config.cfg')
     main()
