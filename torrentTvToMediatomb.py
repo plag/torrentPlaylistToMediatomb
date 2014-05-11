@@ -1,6 +1,7 @@
 #!/usr/bin/python
 import ConfigParser
 import urllib2
+import urllib
 import sqlite3
 import time
 import socket
@@ -112,8 +113,14 @@ def transferPlaylist(link, categoryId, dbConn, aceHost, acePort):
         elif row.startswith('#'):
             continue
         else:
-            streamHash = 'http://' + aceHost + ':' + acePort + '/pid/' + row.rstrip('\n')
-            dbRow = ('',\
+	    row = row.rstrip('\n')
+	    if (row.startswith('acestream://')):
+		row = row[12:]
+	    if row.startswith('http://') and row.endswith('.acelive'):
+		streamHash = 'http://' + aceHost + ':' + acePort + '/torrent/' + urllib.quote(row, '') + '/stream.mp4'
+	    else:		
+            	streamHash = 'http://' + aceHost + ':' + acePort + '/pid/' + row + '/stream.mp4'
+	    dbRow = ('',\
                      str(categories[categoryName]),\
                      '10',\
                      'object.item.videoItem',\
@@ -132,7 +139,7 @@ def transferPlaylist(link, categoryId, dbConn, aceHost, acePort):
 
             sql = 'INSERT INTO mt_cds_object(' + columnsSql + \
                              ") VALUES ('" + "','".join(dbRow) + "')"
-            print 'channel ' + channelName + ':' + categoryName
+            #print 'channel ' + channelName + ':' + categoryName
             cursor.execute(sql)
     dbConn.commit()
 
